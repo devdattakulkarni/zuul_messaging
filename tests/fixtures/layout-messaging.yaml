@@ -1,0 +1,14 @@
+pipelines:
+  - name: check
+    manager: IndependentPipelineManager
+    trigger:
+      messaging:
+        - event: ref-updated
+
+jobs:
+  - name: build:foo-git-update
+
+projects:
+  - name: org/project
+    check:
+      - foo-git-update

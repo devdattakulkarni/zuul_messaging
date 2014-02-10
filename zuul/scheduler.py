@@ -244,6 +244,11 @@ class Scheduler(threading.Thread):
                     f = EventFilter(types=['timer'],
                                     timespecs=toList(trigger['time']))
                     manager.event_filters.append(f)
+            elif 'messaging' in conf_pipeline['trigger']:
+                pipeline.trigger = self.triggers['messaging']
+                for trigger in toList(conf_pipeline['trigger']['messaging']):
+                    f = EventFilter(types=['ref-updated'])
+                    manager.event_filters.append(f)
 
         for project_template in data.get('project-templates', []):
             # Make sure the template only contains valid pipelines

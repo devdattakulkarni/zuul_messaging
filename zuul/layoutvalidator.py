@@ -57,9 +57,12 @@ class LayoutSchema(object):
                       'require-approval': toList(require_approval),
                       }
 
+    messaging_trigger = {v.Required('event'): toList(v.Any('ref-updated')), }
+
     timer_trigger = {v.Required('time'): str}
 
     trigger = v.Required(v.Any({'gerrit': toList(gerrit_trigger)},
+                               {'messaging': toList(messaging_trigger)},
                                {'timer': toList(timer_trigger)}))
 
     report_actions = {'gerrit': variable_dict,

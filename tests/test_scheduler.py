@@ -50,7 +50,10 @@ import zuul.launcher.gearman
 import zuul.reporter.gerrit
 import zuul.reporter.smtp
 import zuul.trigger.gerrit
+import zuul.trigger.messaging
 import zuul.trigger.timer
+
+from zuul.model import TriggerEvent
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__),
                            'fixtures')
@@ -82,6 +85,38 @@ def random_sha1():
 class ChangeReference(git.Reference):
     _common_path_default = "refs/changes"
     _points_to_commits_only = True
+
+
+class FakeMessaging(object):
+    name = 'messaging'
+
+    def __init__(self, config, sched):
+        self.config = config
+        self.sched = sched
+
+    def add_fake_trigger_event(self, context, arg):
+        event = TriggerEvent()
+
+        event.trigger_name = 'messaging'
+        event.type = arg['event_type']
+        event.project_name = arg['project_name']
+        event.newrev = arg['newrev']
+        event.oldrev = arg['oldrev']
+        event.ref = arg['ref']
+
+        self.sched.addEvent(event)
+
+    def postConfig(self):
+        pass
+
+    def getGitUrl(self, project):
+        pass
+
+    def getGitwebUrl(self, project, sha=None):
+        pass
+
+    def maintainCache(self, relevant):
+        return
 
 
 class FakeChange(object):
@@ -835,6 +870,9 @@ class TestScheduler(testtools.TestCase):
         self.timer = zuul.trigger.timer.Timer(self.config, self.sched)
         self.sched.registerTrigger(self.timer)
 
+        self.messaging = FakeMessaging(self.config, self.sched)
+        self.sched.registerTrigger(self.messaging)
+
         self.sched.registerReporter(
             zuul.reporter.gerrit.Reporter(self.gerrit))
         self.smtp_reporter = zuul.reporter.smtp.Reporter(
@@ -954,6 +992,7 @@ class TestScheduler(testtools.TestCase):
     def registerJobs(self):
         count = 0
         for job in self.sched.layout.jobs.keys():
+            self.log.debug('Registering Jobs: %s' % job)
             self.worker.registerFunction('build:' + job)
             count += 1
         self.worker.registerFunction('stop:' + self.worker.worker_id)
@@ -1124,6 +1163,41 @@ class TestScheduler(testtools.TestCase):
 
         pprint.pprint(self.statsd.stats)
         raise Exception("Key %s not found in reported stats" % key)
+
+    def test_messaging_trigger_jobs_launched(self):
+
+        self.worker.hold_jobs_in_build = True
+        self.config.set('zuul', 'layout_config',
+                        'tests/fixtures/layout-messaging.yaml')
+        self.sched.reconfigure(self.config)
+        self.registerJobs()
+
+        #send trigger event
+        ctx = {}
+        arg = dict(event_type='ref-updated',
+                   project_name='org/project',
+                   branch='master',
+                   ref='refs/remotes/origin/master',
+                   newrev='14ff03b47afe91a47fe7e327266f1035fd52ffdc',
+                   oldrev='060639e2d2e976570b47e3ebcc9b2ffa83c3fdd4')
+
+        self.messaging.add_fake_trigger_event(ctx, arg)
+
+        self.waitUntilSettled()
+        port = self.webapp.server.socket.getsockname()[1]
+
+        f = urllib.urlopen("http://localhost:%s/status.json" % port)
+        data = f.read()
+
+        self.worker.hold_jobs_in_build = False
+        self.worker.release()
+        self.waitUntilSettled()
+
+        self.assertEqual(self.getJobFromHistory(
+            'foo-git-update').result, 'SUCCESS')
+
+        data = json.loads(data)
+        # Assert based on the data's fields. Refer to test_timer
 
     def test_jobs_launched(self):
         "Test that jobs are launched and a change is merged"
