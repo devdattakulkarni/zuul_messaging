@@ -6,7 +6,7 @@ pipelines:
         - event: ref-updated
 
 jobs:
-  - name: build:foo-git-update
+  - name: foo-git-update
 
 projects:
   - name: org/project
