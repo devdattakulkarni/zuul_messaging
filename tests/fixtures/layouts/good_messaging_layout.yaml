@@ -5,6 +5,9 @@ pipelines:
       messaging:
         - event: ref-updated
 
+jobs:
+  - name: build:foo-git-update
+
 projects:
   - name: org/project
     check:

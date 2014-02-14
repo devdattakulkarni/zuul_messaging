@@ -3,7 +3,10 @@ pipelines:
     manager: IndependentPipelineManager
     trigger:
       messaging:
-        - event: ref-updated
+        - event: ref-updated-sdjfksjhfsjfd
+
+jobs:
+  - name: build:foo-git-update
 
 projects:
   - name: org/project
